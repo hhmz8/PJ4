@@ -1,0 +1,23 @@
+Hanzhe Huang
+10/31/2021
+Project 4
+
+Description:
+This program manages n licenses and logs messages into the logfile through licensed child processes, and manages the critical section with the use of a message queue.
+The command line stdin should contain lines in the format of "testsim int int", similarly to the example file, testing.data.
+
+Usage:
+./runsim [n] < stdin
+
+Example Usage:
+./runsim 2 < testing.data
+
+Files:
+runsim.c, runsim.h, testsim.c, testing.data, makefile, logfile(generated), README
+
+References:
+
+
+
+Git Repository:
+https://github.com/hhmz8/PJ4
