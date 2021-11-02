@@ -13,7 +13,7 @@ Example Usage:
 ./runsim 2 < testing.data
 
 Files:
-runsim.c, runsim.h, testsim.c, testing.data, makefile, logfile(generated), README
+oss.c, oss.h, makefile, logfile(generated), README
 
 References:
 

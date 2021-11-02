@@ -1,7 +1,7 @@
 ﻿/*
 Hanzhe Huang
 10/20/2021
-runsim.c
+oss.c
 */
 
 #include <stdio.h>
@@ -17,8 +17,8 @@ runsim.c
 #include <signal.h>
 #include <ctype.h> //isprint
 #include <unistd.h> //sleep, alarm
-
-#include "runsim.h"
+#include "structs.h"
+#include "oss.h"
 
 // Reference: https://www.tutorialspoint.com/inter_process_communication/inter_process_communication_shared_memory.htm
 // Reference: https://stackoverflow.com/questions/19461744/how-to-make-parent-wait-for-all-child-processes-to-finish
@@ -27,38 +27,10 @@ runsim.c
 
 extern int errno;
 
-struct ossclock {
-	int clockSecs = 0;
-	int clockNS = 0;
-}
-
-struct process {
-	int pid;
-	int blockTime;
-}
-
-struct shmseg {
-	int nlicenses;
-	int avaliable[MAX_PRO]; //Boolean
-	char buf[BUF_SIZE];
-   
-	// Clock
-	int ossclock;
-   
-	// Process table
-	struct process processTable[18];
-};
-
-struct msgbuf {
-	long type;
-	char text[200];
-} msg_t;
-
 int main(int argc, char** argv) {
 	// Signal handlers;
 	signal(SIGINT, sigint_parent);
 	signal(SIGALRM, sigalrm);
-	alarm(MAX_TIME);
 	
 	// Interval constants
 	const int maxTimeBetweenNewProcsSecs = 1;
@@ -79,13 +51,10 @@ int main(int argc, char** argv) {
 	int id = 0;
 	int pid = 1;
 	int option = 0;
-	int licenseLimit = 0;
-	int max_sec
-	char arg[3][MAX_CHAR];
+	int shmobjLimit = 0;
+	int max_sec;
+	int sleepTime = 0;
 	char logName[20] = "logfile";
-	fscanf(stdin, "%s", arg[0]);
-	fscanf(stdin, "%s", arg[1]);
-	fscanf(stdin, "%s", arg[2]);
 	
 	// Clear log file
 	fptr = fopen(logName, "w");
@@ -110,10 +79,11 @@ int main(int argc, char** argv) {
 			
 		case 's':
 			sleepTime = atoi(optarg);
-			if (sleepTime > 10 || sleepTime < 1) {
-				perror("Invalid or large sleep duration. sec must be between 1-10.");
+			if (sleepTime > 60 || sleepTime < 1) {
+				perror("Invalid or large sleep duration. sec must be between 1-60.");
 				return -1;
 			}
+			alarm(sleepTime);
 			break;
 			
 		case '?':
@@ -131,28 +101,24 @@ int main(int argc, char** argv) {
 		return -1;
 	}
 	if (optind < argc) {
-		licenseLimit = atoi(argv[optind]);
-		if (licenseLimit > MAX_PRO - 2){
-			perror("License number too large");
+		shmobjLimit = atoi(argv[optind]);
+		if (shmobjLimit > MAX_PRO - 2){
+			perror("shmobj number too large");
 			return -1;
 		}
 	}
 	else {
-		printf("Defaulting license # to 1.\n");
-		licenseLimit = 1;
+		printf("Defaulting shmobj # to 1.\n");
+		shmobjLimit = 1;
 	}
 	
 	// Init 
-	initlicense(license(), licenseLimit);
+	initshmobj(shmobj());
 	
 	// Fork loop
 	while(1){
-		// Request license
-		getlicense(license());
-		removelicenses(license(),1);
-		printf("Fetched license. Remaining licenses: %d\n", license()->nlicenses);
-		license()->avaliable[id] = 0;
 		
+		sleep(1);
 		pid = fork();
 		switch ( pid )
 		{
@@ -161,28 +127,10 @@ int main(int argc, char** argv) {
 			return -1;
 
 		case 0: // Child, terminates
-			child(id, arg[0], arg[1], arg[2]);
+			child(id);
 			break;
 
 		default: // Parent, loops
-			// Get empty bakery id
-			for (i = 0; i < MAX_PRO; i++){
-				if (license()->avaliable[i] == 1){
-					id = i;
-					break;
-				}
-			}
-			// Get next inputs
-			for (i = 0; i < 3; i++){
-				if (fscanf(stdin, "%s", arg[i]) == EOF){
-					// EOF 
-					printf("End of file reached.\n");
-					parent();
-					deallocate();
-					logexit();
-					return 0;
-				}
-			}
 			break;
 		}
 	}
@@ -218,10 +166,8 @@ void sigint(int sig){
 
 void sigalrm(int sig){
 	printf("Program timed out.\n");
-	deallocate();
-	printf("Terminating child processes...\n");
-	kill(0, SIGINT);
 	parent();
+	deallocate();
 	logexit();
 	exit(0);
 }
@@ -236,29 +182,18 @@ void parent(){
 
 // Reference: http://www.cs.umsl.edu/~sanjiv/classes/cs4760/src/shm.c
 // Reference: https://www.geeksforgeeks.org/signals-c-set-2/
-void child(int id, char* arg1, char* arg2, char* arg3){
+void child(int id){
 	signal(SIGINT, sigint);
 	signal(SIGALRM, SIG_IGN);
 	
 	printf("Child %d with id # %d forked from parent %d.\n",getpid(), id, getppid());
 	
-	// Reference: Lecture video on message queues 
-	// Recieve message, block if empty, otherwise continue
-	int msgid = msgget(MSG_KEY, 0666 | IPC_CREAT);
-	msgrcv(msgid, &msg_t, sizeof(msg_t), 1, 0);
-	printf("Child %d recieved message.\n", getpid());
-	
-	// Critical section
-	docommand(arg1, arg2, arg3);
-	// Critical secion, end 
-	
-	msg_t.type = 1;
-	msgsnd(msgid, &msg_t, sizeof(msg_t), 0);
-	
-	// Return license
-	returnlicense(license());
-	printf("Child %d finished.\n", getpid());
-	exit(0);
+	// Exec user process
+	if ((execl(userprocess, "userprocess") == -1){
+		perror("Error: execl/stdin");
+		exit(-1);
+	}
+	exit(1);
 }
 
 // Deallocates shared memory & message queue
@@ -286,8 +221,8 @@ void deallocate(){
 	printf("Shared memory & message queue deallocated.\n");
 }
 
-// Returns the shared memory segment / license object
-struct shmseg* license(){
+// Returns the shared memory segment
+struct shmseg* shmobj(){
 	struct shmseg *shmp;
     int shmid = shmget(SHM_KEY, BUF_SIZE, 0666|IPC_CREAT);
 	if (shmid == -1) {
@@ -298,56 +233,9 @@ struct shmseg* license(){
 	return shmp;
 }
 
-// Blocks process until a license is avaliable
-void getlicense(struct shmseg* shmp){
-	if (shmp->nlicenses < 1){
-		printf("%d waiting for avaliable license...\n", getpid());
-		while(shmp->nlicenses < 1);
-	}
-}
-
-// Increments license #
-void returnlicense(struct shmseg* shmp){
-	shmp->nlicenses++;
-}
-
-// Initializes license object with n licenses
-void initlicense(struct shmseg* shmp, int n){
-	shmp->nlicenses = n;
-	int i;
-	for (i = 0; i < MAX_PRO; i++) {
-		shmp->avaliable[i] = 1;
-	}
-}
-
-// Decrements n licenses
-void removelicenses(struct shmseg* shmp, int n){
-	shmp->nlicenses -= n;
-}
-
-// Runs testsim
-void docommand(char* arg1, char* arg2, char* arg3){
-	int pid;
-	int childpid;
-	
-	pid = fork();
-	switch ( pid )
-	{
-	case -1:
-		perror("Error: fork");
-		exit(-1);
-
-	case 0:
-		if ((execl(arg1, "docommand", arg2, arg3, (char*)NULL)) == -1){
-			perror("Error: execl/stdin");
-		}
-		exit(-1);
-		break;
-
-	default:
-		break;
-	}
-	
-	// Wait for grandchild execl 
-	while ((childpid = (wait(NULL))) > 0);
+// Initializes shared memory segment
+void initshmobj(struct shmseg* shmp){
+	shmp->ossclock.clockSecs = 0;
+	shmp->ossclock.clockNS = 0;
+	//shmp->processTable[18];
 }

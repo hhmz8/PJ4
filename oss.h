@@ -4,8 +4,8 @@ Hanzhe Huang
 runsim.h
 */
 
-#ifndef RUNSIM_H
-#define RUNSIM_H
+#ifndef OSS_H
+#define OSS_H
 
 void logexit();
 void sigint_parent(int sig);
@@ -13,15 +13,11 @@ void sigint(int sig);
 void sigalrm(int sig);
 
 void parent();
-void child(int id, char* arg1, char* arg2, char* arg3);
+void child(int id);
 void deallocate();
-struct shmseg* license();
 
-void getlicense(struct shmseg* shmp);
-void returnlicense(struct shmseg* shmp);
-void initlicense(struct shmseg* shmp, int n);
-void removelicenses(struct shmseg* shmp, int n);
-void docommand(char* arg1, char* arg2, char* arg3);
+struct shmseg* shmobj();
+void initshmobj(struct shmseg* shmp);
 
 #define BUF_SIZE 1024
 #define SHM_KEY 806040
