@@ -156,7 +156,6 @@ int main(int argc, char** argv) {
 		if (msg_t.queueType != 2) {
 			printf("Saving: Receiving that process with PID %d ran for %d nanoseconds.\n", pid, msg_t.msgclock.clockNS);
 			fprintf(fptr, "OSS: Receiving that process with PID %d ran for %d nanoseconds.\n", pid, msg_t.msgclock.clockNS);
-			incrementClock(shmobj(), msg_t.msgclock.clockSecs, msg_t.msgclock.clockNS);
 		}
 		else {
 			printf("Saving: Receiving that process with PID %d ran for %d nanoseconds,\n", pid, msg_t.msgclock.clockNS);
@@ -164,6 +163,7 @@ int main(int argc, char** argv) {
 			fprintf(fptr, "OSS: Receiving that process with PID %d ran for %d nanoseconds,\n", pid, msg_t.msgclock.clockNS);
 			fprintf(fptr, "OSS: not using its entire time quantum.\n");
 		}
+		incrementClock(shmobj(), msg_t.msgclock.clockSecs, msg_t.msgclock.clockNS);
 		
 		if (processNum > TOTAL_PRO){
 			printf("OSS: Reached process limit.\n");

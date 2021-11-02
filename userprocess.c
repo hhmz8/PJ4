@@ -16,14 +16,49 @@ userprocess.c
 #include <unistd.h> //sleep
 #include "structs.h"
 
+#define EXIT_PCT 10
+#define CPU_PCT 60
+#define CPU_BLOCK 10
+#define IO_BLOCK 60
+#define MAX_NS 9000000
+
 // Reference: https://www.tutorialspoint.com/c_standard_library/c_function_rand.htm
 int main(int argc, char** argv){
-	const int runtimeMaxNS = 9000000;
-	
 	pid_t pid = getpid();
 	time_t t;
 	srand((unsigned) time(&t));
-	int runtime = rand() % runtimeMaxNS;
+	int processType;
+	int blockChance;
+	
+	// Termination
+	if ((rand() % 100) < EXIT_PCT){
+		msg_t.queueType = -1;
+	}
+	
+	 // CPU / IO
+	else if ((rand() % 100) < CPU_PCT){
+		processType = 1;
+	}
+	else {
+		processType = 0;
+	}
+	
+	if (processType == 0){
+		blockChance = IO_BLOCK;
+	}
+	else {
+		blockChance = CPU_BLOCK;
+	}
+	
+	// Block
+	if ((rand() % 100) < blockChance){
+		msg_t.queueType = 0;
+	}
+	else{
+		msg_t.queueType = 2;
+	}
+	
+	int runtime = rand() % MAX_NS;
 	int msgid = msgget(MSG_KEY, 0666 | IPC_CREAT);
 	
 	// Wait for message of type pid
