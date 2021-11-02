@@ -34,6 +34,7 @@ int main(int argc, char** argv){
 	msg_t.queueType = 0;
 	msg_t.msgclock.clockSecs = 0;
 	msg_t.msgclock.clockNS = runtime;
+	msg_t.maxNS = runtime;
 	
 	// Send message
 	msgsnd(msgid, &msg_t, sizeof(msg_t), 0);

@@ -102,6 +102,7 @@ int main(int argc, char** argv) {
 	// Clear log file
 	fptr = fopen(logName, "w");
 	fclose(fptr);
+	fptr = fopen(logName, "a");
 	
 	// Shm Init 
 	initshmobj(shmobj());
@@ -134,16 +135,15 @@ int main(int argc, char** argv) {
 				child();
 				break;
 
-			default: // Parent, loops
+			default: // Parent
+				processNum++;
 				break;
 			}
 		}
 		// Store pid to process table
 		shmp->processTable[i].processPid = pid;
-		fptr = fopen(logName, "a");
 		printf("Saving: Generating process with PID %d and putting it in queue %d at time %d:%d.\n", pid, 0, shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
 		fprintf(fptr, "OSS: Generating process with PID %d and putting it in queue %d at time %d:%d.\n", pid, 0, shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
-		fclose(fptr);
 		
 		// Grab item from highest priority non-empty queue
 		
@@ -152,20 +152,27 @@ int main(int argc, char** argv) {
 		msg_t.mtype = pid;
 		msgsnd(msgid, &msg_t, sizeof(msg_t), 0);
 		msgrcv(msgid, &msg_t, sizeof(msg_t), 1, 0);
-		fptr = fopen(logName, "a");
-		printf("Saving: Receiving that process with PID %d ran for %d nanoseconds.\n", pid, msg_t.msgclock.clockNS);
-		fprintf(fptr, "OSS: Receiving that process with PID %d ran for %d nanoseconds.\n", pid, msg_t.msgclock.clockNS);
-		fclose(fptr);
-		incrementClock(shmobj(), msg_t.msgclock.clockSecs, msg_t.msgclock.clockNS);
 		
-		sleep(1);
+		if (msg_t.queueType != 2) {
+			printf("Saving: Receiving that process with PID %d ran for %d nanoseconds.\n", pid, msg_t.msgclock.clockNS);
+			fprintf(fptr, "OSS: Receiving that process with PID %d ran for %d nanoseconds.\n", pid, msg_t.msgclock.clockNS);
+			incrementClock(shmobj(), msg_t.msgclock.clockSecs, msg_t.msgclock.clockNS);
+		}
+		else {
+			printf("Saving: Receiving that process with PID %d ran for %d nanoseconds,\n", pid, msg_t.msgclock.clockNS);
+			printf("Saving: not using its entire time quantum.\n");
+			fprintf(fptr, "OSS: Receiving that process with PID %d ran for %d nanoseconds,\n", pid, msg_t.msgclock.clockNS);
+			fprintf(fptr, "OSS: not using its entire time quantum.\n");
+		}
 		
-		processNum++;
 		if (processNum > TOTAL_PRO){
 			printf("OSS: Reached process limit.\n");
 			break;
 		}
+		
+		sleep(1);
 	}
+	fclose(fptr);
 	logexit();
 	return -1;
 }

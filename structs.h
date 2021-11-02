@@ -29,6 +29,7 @@ struct msgbuf {
 	long mtype;
 	int queueType;
 	struct clock msgclock;
+	int maxNS;
 } msg_t;
 
 #endif
