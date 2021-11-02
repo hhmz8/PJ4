@@ -26,6 +26,7 @@ oss.c
 // Reference: https://www.geeksforgeeks.org/ipc-using-message-queues/
 
 extern int errno;
+static char logName[20] = "logfile";
 
 int main(int argc, char** argv) {
 	// Signal handlers;
@@ -33,8 +34,8 @@ int main(int argc, char** argv) {
 	signal(SIGALRM, sigalrm);
 	
 	// Interval constants
-	const int maxTimeBetweenNewProcsSecs = 1;
-	const int maxTimeBetweenNewProcsNS = 1;
+	//const int maxTimeBetweenNewProcsSecs = 1;
+	//const int maxTimeBetweenNewProcsNS = 1;
 	
 	// Message queue init, also send an empty message
 	int msgid = msgget(MSG_KEY, 0666 | IPC_CREAT);
@@ -47,14 +48,11 @@ int main(int argc, char** argv) {
 	msgsnd(msgid, &msg_t, sizeof(msg_t), 0);
 	
 	FILE* fptr;
-	int i;
 	int id = 0;
 	int pid = 1;
 	int option = 0;
 	int shmobjLimit = 0;
-	int max_sec;
 	int sleepTime = 0;
-	char logName[20] = "logfile";
 	
 	// Clear log file
 	fptr = fopen(logName, "w");
@@ -189,7 +187,7 @@ void child(int id){
 	printf("Child %d with id # %d forked from parent %d.\n",getpid(), id, getppid());
 	
 	// Exec user process
-	if ((execl(userprocess, "userprocess") == -1){
+	if ((execl("userprocess", "userprocess", (char*)NULL)) == -1){
 		perror("Error: execl/stdin");
 		exit(-1);
 	}
