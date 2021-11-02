@@ -139,6 +139,7 @@ int main(int argc, char** argv) {
 		}
 		// Store pid to process table
 		shmp->processTable[i].processPid = pid;
+		printf("OSS: Generating process with PID %d and putting it in queue %d at time %d:%d.\n", pid, 0, shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
 		
 		// Grab item from highest priority non-empty queue
 		
@@ -147,7 +148,7 @@ int main(int argc, char** argv) {
 		msg_t.mtype = pid;
 		msgsnd(msgid, &msg_t, sizeof(msg_t), 0);
 		msgrcv(msgid, &msg_t, sizeof(msg_t), 1, 0);
-		printf("Message recieved at parent.\n");
+		printf("OSS: Receiving that process with PID %d ran for %d nanoseconds.\n", pid, msg_t.msgclock.clockNS);
 		sleep(60);
 	}
 	logexit();
