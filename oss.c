@@ -54,7 +54,8 @@ int main(int argc, char** argv) {
 	int pid = 1;
 	int option = 0;
 	int terminationTime = 0;
-	int queues[3][18];
+	int processNum = 0;
+	int queues[3][MAX_PRO];
 	logName = malloc(200);
 	logName = "logfile";
 
@@ -149,7 +150,15 @@ int main(int argc, char** argv) {
 		msgsnd(msgid, &msg_t, sizeof(msg_t), 0);
 		msgrcv(msgid, &msg_t, sizeof(msg_t), 1, 0);
 		printf("OSS: Receiving that process with PID %d ran for %d nanoseconds.\n", pid, msg_t.msgclock.clockNS);
-		sleep(60);
+		incrementClock(shmobj(), msg_t.msgclock.clockSecs, msg_t.msgclock.clockNS);
+		
+		sleep(1);
+		
+		processNum++;
+		if (processNum > TOTAL_PRO){
+			printf("OSS: Reached process limit.\n");
+			break;
+		}
 	}
 	logexit();
 	return -1;
@@ -271,4 +280,14 @@ void initshmobj(struct shmseg* shmp){
 	shmp->ossclock.clockSecs = 0;
 	shmp->ossclock.clockNS = 0;
 	//shmp->processTable[18];
+}
+
+// Increments the clock by seconds and nanoseconds
+void incrementClock(struct shmseg* shmp, int incS, int incNS){
+	shmp->ossclock.clockSecs += incS;
+	shmp->ossclock.clockNS += incNS;
+	if (shmp->ossclock.clockNS >= 1000000000){
+		shmp->ossclock.clockSecs++;
+		shmp->ossclock.clockNS -= 1000000000;
+	}
 }

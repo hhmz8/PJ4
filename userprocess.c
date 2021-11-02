@@ -16,9 +16,14 @@ userprocess.c
 #include <unistd.h> //sleep
 #include "structs.h"
 
+// Reference: https://www.tutorialspoint.com/c_standard_library/c_function_rand.htm
 int main(int argc, char** argv){
+	const int runtimeMaxNS = 9000000;
+	
 	pid_t pid = getpid();
-	int runtime = 5000000;
+	time_t t;
+	srand((unsigned) time(&t));
+	int runtime = rand() % runtimeMaxNS;
 	int msgid = msgget(MSG_KEY, 0666 | IPC_CREAT);
 	
 	// Wait for message of type pid
