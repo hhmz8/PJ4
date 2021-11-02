@@ -10,8 +10,8 @@ struct clock {
 };
 
 struct process {
-	int pid;
-	int blockTime;
+	int processPid;
+	int processBlockNS;
 };
 
 // Process control block
@@ -26,7 +26,7 @@ struct shmseg {
 };
 
 struct msgbuf {
-	long type;
+	long mtype;
 	int queueType;
 	struct clock msgclock;
 } msg_t;

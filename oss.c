@@ -26,7 +26,7 @@ oss.c
 // Reference: https://www.geeksforgeeks.org/ipc-using-message-queues/
 
 extern int errno;
-static char logName[20] = "logfile";
+static char* logName;
 
 int main(int argc, char** argv) {
 	// Signal handlers;
@@ -37,26 +37,26 @@ int main(int argc, char** argv) {
 	//const int maxTimeBetweenNewProcsSecs = 1;
 	//const int maxTimeBetweenNewProcsNS = 1;
 	
-	// Message queue init, also send an empty message
+	// Message queue init
 	int msgid = msgget(MSG_KEY, 0666 | IPC_CREAT);
 	if (msgid == -1) {
 		perror("Error: msgget");
 		exit(-1);
 	}
 	
+	/*
 	msg_t.type = 1;
 	msgsnd(msgid, &msg_t, sizeof(msg_t), 0);
+	*/
 	
 	FILE* fptr;
-	int id = 0;
+	int i;
 	int pid = 1;
 	int option = 0;
-	int shmobjLimit = 0;
-	int sleepTime = 0;
-	
-	// Clear log file
-	fptr = fopen(logName, "w");
-	fclose(fptr);
+	int terminationTime = 0;
+	int queues[3][18];
+	logName = malloc(200);
+	logName = "logfile";
 
 	// Reference: https://www.gnu.org/software/libc/manual/html_node/Example-of-Getopt.html
 	while ((option = getopt(argc, argv, "ht:")) != -1) {
@@ -76,12 +76,16 @@ int main(int argc, char** argv) {
 			break;
 			
 		case 's':
-			sleepTime = atoi(optarg);
-			if (sleepTime > 60 || sleepTime < 1) {
+			terminationTime = atoi(optarg);
+			if (terminationTime > 60 || terminationTime < 1) {
 				perror("Invalid or large sleep duration. sec must be between 1-60.");
 				return -1;
 			}
-			alarm(sleepTime);
+			alarm(terminationTime);
+			break;
+			
+		case 'l':
+			logName = optarg;
 			break;
 			
 		case '?':
@@ -94,47 +98,77 @@ int main(int argc, char** argv) {
 		}
 	}
 	
-	if (argc > 2) {
-		perror("Too many parameters entered");
-		return -1;
-	}
-	if (optind < argc) {
-		shmobjLimit = atoi(argv[optind]);
-		if (shmobjLimit > MAX_PRO - 2){
-			perror("shmobj number too large");
-			return -1;
-		}
-	}
-	else {
-		printf("Defaulting shmobj # to 1.\n");
-		shmobjLimit = 1;
-	}
+	// Clear log file
+	fptr = fopen(logName, "w");
+	fclose(fptr);
 	
-	// Init 
+	// Shm Init 
 	initshmobj(shmobj());
+	
+	struct shmseg *shmp;
+    int shmid = shmget(SHM_KEY, BUF_SIZE, 0666|IPC_CREAT);
+	if (shmid == -1) {
+		perror("Error: shmget");
+		exit(-1);
+	}
+	shmp = shmat(shmid, 0, 0);
 	
 	// Fork loop
 	while(1){
 		
-		sleep(1);
-		pid = fork();
-		switch ( pid )
-		{
-		case -1:
-			perror("Error: fork");
-			return -1;
-
-		case 0: // Child, terminates
-			child(id);
-			break;
-
-		default: // Parent, loops
-			break;
+		for (i = 0; i < MAX_PRO; i++){
+			if (shmp->processTable[i].processPid < 1) {
+				break;
+			}
 		}
+		if (i != MAX_PRO){
+			pid = fork();
+			switch ( pid )
+			{
+			case -1:
+				perror("Error: fork");
+				return -1;
+
+			case 0: // Child, terminates
+				child();
+				break;
+
+			default: // Parent, loops
+				break;
+			}
+		}
+		// Store pid to process table
+		shmp->processTable[i].processPid = pid;
+		
+		// Grab item from highest priority non-empty queue
+		
+		
+		// Send message to child if item is found, wait for child
+		msg_t.mtype = pid;
+		msgsnd(msgid, &msg_t, sizeof(msg_t), 0);
+		msgrcv(msgid, &msg_t, sizeof(msg_t), 1, 0);
+		printf("Message recieved at parent.\n");
+		sleep(60);
 	}
 	logexit();
 	return -1;
 }
+
+int getLast(int array[MAX_PRO]){
+	int i;
+	for (i = 0; i < MAX_PRO; i++){
+		if (array[i] < 1) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+/* Log
+	fptr = fopen(logName, "a");
+	fprintf(fptr, "");
+	fptr = fopen(logName, "a");
+*/
 
 // Logs termination time
 void logexit(){
@@ -180,11 +214,11 @@ void parent(){
 
 // Reference: http://www.cs.umsl.edu/~sanjiv/classes/cs4760/src/shm.c
 // Reference: https://www.geeksforgeeks.org/signals-c-set-2/
-void child(int id){
+void child(){
 	signal(SIGINT, sigint);
 	signal(SIGALRM, SIG_IGN);
 	
-	printf("Child %d with id # %d forked from parent %d.\n",getpid(), id, getppid());
+	printf("Child %d forked from parent %d.\n",getpid(), getppid());
 	
 	// Exec user process
 	if ((execl("userprocess", "userprocess", (char*)NULL)) == -1){

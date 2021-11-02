@@ -6,6 +6,9 @@ runsim.h
 
 #ifndef OSS_H
 #define OSS_H
+#define MAX_PRO 18
+
+int getLast(int array[MAX_PRO]);
 
 void logexit();
 void sigint_parent(int sig);
@@ -13,12 +16,11 @@ void sigint(int sig);
 void sigalrm(int sig);
 
 void parent();
-void child(int id);
+void child();
 void deallocate();
 
 struct shmseg* shmobj();
 void initshmobj(struct shmseg* shmp);
 
-#define MAX_PRO 20
 
 #endif
