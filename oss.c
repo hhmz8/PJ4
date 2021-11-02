@@ -140,7 +140,10 @@ int main(int argc, char** argv) {
 		}
 		// Store pid to process table
 		shmp->processTable[i].processPid = pid;
-		printf("OSS: Generating process with PID %d and putting it in queue %d at time %d:%d.\n", pid, 0, shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
+		fptr = fopen(logName, "a");
+		printf("Saving: Generating process with PID %d and putting it in queue %d at time %d:%d.\n", pid, 0, shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
+		fprintf(fptr, "OSS: Generating process with PID %d and putting it in queue %d at time %d:%d.\n", pid, 0, shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
+		fclose(fptr);
 		
 		// Grab item from highest priority non-empty queue
 		
@@ -149,7 +152,10 @@ int main(int argc, char** argv) {
 		msg_t.mtype = pid;
 		msgsnd(msgid, &msg_t, sizeof(msg_t), 0);
 		msgrcv(msgid, &msg_t, sizeof(msg_t), 1, 0);
-		printf("OSS: Receiving that process with PID %d ran for %d nanoseconds.\n", pid, msg_t.msgclock.clockNS);
+		fptr = fopen(logName, "a");
+		printf("Saving: Receiving that process with PID %d ran for %d nanoseconds.\n", pid, msg_t.msgclock.clockNS);
+		fprintf(fptr, "OSS: Receiving that process with PID %d ran for %d nanoseconds.\n", pid, msg_t.msgclock.clockNS);
+		fclose(fptr);
 		incrementClock(shmobj(), msg_t.msgclock.clockSecs, msg_t.msgclock.clockNS);
 		
 		sleep(1);
@@ -177,7 +183,7 @@ int getLast(int array[MAX_PRO]){
 /* Log
 	fptr = fopen(logName, "a");
 	fprintf(fptr, "");
-	fptr = fopen(logName, "a");
+	fclose(fptr);
 */
 
 // Logs termination time
@@ -227,8 +233,6 @@ void parent(){
 void child(){
 	signal(SIGINT, sigint);
 	signal(SIGALRM, SIG_IGN);
-	
-	printf("Child %d forked from parent %d.\n",getpid(), getppid());
 	
 	// Exec user process
 	if ((execl("userprocess", "userprocess", (char*)NULL)) == -1){

@@ -28,7 +28,6 @@ int main(int argc, char** argv){
 	
 	// Wait for message of type pid
 	msgrcv(msgid, &msg_t, sizeof(msg_t), pid, 0);
-	printf("Message recieved at child.\n");
 	
 	// Set message
 	msg_t.mtype = 1;
