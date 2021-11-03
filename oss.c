@@ -256,13 +256,10 @@ int main(int argc, char** argv) {
 		
 		if (processNum >= TOTAL_PRO){
 			sleep(1); // Catch any slow child processes
-			if (waitpid(0, &status, WNOHANG) < 1){
-				printf("%d\n",(waitpid(0, &status, WNOHANG)));
-				printf("%d\n",getLast(queues[0], MAX_PRO));
-				printf("%d\n",getLast(queues[1], MAX_PRO));
-				printf("%d\n",getLast(queues[2], MAX_PRO));
-				printf("OSS: Reached process limit.\n");
-				break;
+			if (waitpid(0, &status, WNOHANG) < 1 && dequeue(queues[0], MAX_PRO) == -1 && dequeue(queues[1], MAX_PRO) == -1 && dequeue(queues[2], MAX_PRO) == -1){
+				fclose(fptr);
+				logexit();
+				return 0;
 			}
 		}
 	}
