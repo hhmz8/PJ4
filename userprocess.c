@@ -54,7 +54,7 @@ int main(int argc, char** argv){
 	if ((rand() % 100) < blockChance){
 		msg_t.queueType = 0;
 	}
-	else{
+	else {
 		msg_t.queueType = 2;
 	}
 	

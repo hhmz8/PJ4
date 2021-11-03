@@ -17,6 +17,7 @@ oss.c
 #include <signal.h>
 #include <ctype.h> //isprint
 #include <unistd.h> //sleep, alarm
+#include "queue.c"
 #include "structs.h"
 #include "oss.h"
 
@@ -34,8 +35,8 @@ int main(int argc, char** argv) {
 	signal(SIGALRM, sigalrm);
 	
 	// Interval constants
-	//const int maxTimeBetweenNewProcsSecs = 1;
-	//const int maxTimeBetweenNewProcsNS = 1;
+	//const int maxTimeBetweenNewProcsSecs = 0;
+	//const int maxTimeBetweenNewProcsNS = 500000;
 	
 	// Message queue init
 	int msgid = msgget(MSG_KEY, 0666 | IPC_CREAT);
@@ -56,6 +57,9 @@ int main(int argc, char** argv) {
 	int terminationTime = 0;
 	int processNum = 0;
 	int queues[3][MAX_PRO];
+	initQueue(queues[0], MAX_PRO);
+	initQueue(queues[1], MAX_PRO);
+	initQueue(queues[2], MAX_PRO);
 	logName = malloc(200);
 	logName = "logfile";
 
@@ -177,22 +181,6 @@ int main(int argc, char** argv) {
 	return -1;
 }
 
-int getLast(int array[MAX_PRO]){
-	int i;
-	for (i = 0; i < MAX_PRO; i++){
-		if (array[i] < 1) {
-			return i;
-		}
-	}
-	return -1;
-}
-
-/* Log
-	fptr = fopen(logName, "a");
-	fprintf(fptr, "");
-	fclose(fptr);
-*/
-
 // Logs termination time
 void logexit(){
 	FILE* fptr;
@@ -200,10 +188,11 @@ void logexit(){
 	time_t tempTime = time(NULL);
 	fptr = fopen(logName, "a");
 	strftime(timeBuffer, 40, "%H:%M:%S", localtime(&tempTime));
-	fprintf(fptr, "%s %d terminated\n", timeBuffer, getpid());
+	fprintf(fptr, "OSS: %s %d terminated\n", timeBuffer, getpid());
 	fclose(fptr);
 }
 
+// Signals
 void sigint_parent(int sig){
 	printf("Process %d exiting...\n",getpid());
 	deallocate();
@@ -290,7 +279,6 @@ struct shmseg* shmobj(){
 void initshmobj(struct shmseg* shmp){
 	shmp->ossclock.clockSecs = 0;
 	shmp->ossclock.clockNS = 0;
-	//shmp->processTable[18];
 }
 
 // Increments the clock by seconds and nanoseconds

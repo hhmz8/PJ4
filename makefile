@@ -1,19 +1,17 @@
 CC = gcc
 CFLAGS = -Wall
-OBJ = userprocess.o oss.o
+DEPS = queue.h queue.c structs.h userprocess.c oss.h oss.c
+OBJ = queue.o userprocess.o oss.o
 
 all: oss userprocess
 
-oss.o: oss.c oss.h structs.h
+%.o: %.c $(DEPS)
 	$(CC) $(CFLAGS) -c -o $@ $<
-	
-userprocess.o: userprocess.c structs.h
-	$(CC) $(CFLAGS) -c -o $@ $<
-	
-oss: oss.o
-	$(CC) $(CFLAGS) -o $@ $^
 	
 userprocess: userprocess.o
+	$(CC) $(CFLAGS) -o $@ $^
+	
+oss: oss.o
 	$(CC) $(CFLAGS) -o $@ $^
 	
 clean:

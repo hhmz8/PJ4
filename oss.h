@@ -9,8 +9,6 @@ runsim.h
 #define MAX_PRO 18
 #define TOTAL_PRO 1
 
-int getLast(int array[MAX_PRO]);
-
 void logexit();
 void sigint_parent(int sig);
 void sigint(int sig);
