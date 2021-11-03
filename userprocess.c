@@ -20,7 +20,7 @@ userprocess.c
 #define CPU_PCT 60
 #define CPU_BLOCK 10
 #define IO_BLOCK 70
-#define MAX_NS 9000000
+#define MAX_NS 900000000
 
 // Reference: https://www.tutorialspoint.com/c_standard_library/c_function_rand.htm
 int main(int argc, char** argv){
@@ -30,6 +30,8 @@ int main(int argc, char** argv){
 	int processType;
 	int blockChance;
 	int queueType;
+	int maxRunTime = rand() % MAX_NS;
+	int runTime = 0;
 	
 	// Termination
 	if ((rand() % 100) < EXIT_PCT){
@@ -51,28 +53,33 @@ int main(int argc, char** argv){
 		blockChance = CPU_BLOCK;
 	}
 	
-	// Block
-	if ((rand() % 100) < blockChance){
-		queueType = 0;
+	while (runTime < maxRunTime){
+		// Block
+		if ((rand() % 100) < blockChance){
+			queueType = 0;
+			runTime = maxRunTime;
+		}
+		else {
+			queueType = 2;
+			runTime = (rand() % ((maxRunTime - 1) - runTime));
+		}
+		
+		int msgid = msgget(MSG_KEY, 0666 | IPC_CREAT);
+		
+		printf("%d WAITING\n", pid);
+		// Wait for message of type pid
+		msgrcv(msgid, &msg_t, sizeof(msg_t), pid, 0);
+		printf("%d FINISHED WAITING\n", pid);
+		
+		// Set message
+		msg_t.mtype = 1;
+		msg_t.queueType = queueType;
+		msg_t.msgclock.clockSecs = 0;
+		msg_t.msgclock.clockNS = maxRunTime;
+		msg_t.maxNS = runTime;
+		
+		// Send message
+		msgsnd(msgid, &msg_t, sizeof(msg_t), 0);
 	}
-	else {
-		queueType = 2;
-	}
-	
-	int runtime = rand() % MAX_NS;
-	int msgid = msgget(MSG_KEY, 0666 | IPC_CREAT);
-	
-	// Wait for message of type pid
-	msgrcv(msgid, &msg_t, sizeof(msg_t), pid, 0);
-	
-	// Set message
-	msg_t.mtype = 1;
-	msg_t.queueType = queueType;
-	msg_t.msgclock.clockSecs = 0;
-	msg_t.msgclock.clockNS = runtime;
-	msg_t.maxNS = runtime;
-	
-	// Send message
-	msgsnd(msgid, &msg_t, sizeof(msg_t), 0);
 	return 0;
 }
