@@ -7,7 +7,7 @@ runsim.h
 #ifndef OSS_H
 #define OSS_H
 #define MAX_PRO 18
-#define TOTAL_PRO 3
+#define TOTAL_PRO 8
 #define MAX_DISPATCH 10000
 #define MAX_UNBLOCK 20000
 

@@ -36,7 +36,9 @@ int main(int argc, char** argv) {
 	
 	// Interval constants
 	const int maxTimeBetweenNewProcsSecs = 1;
-	const int maxTimeBetweenNewProcsNS = 1;
+	const int maxTimeBetweenNewProcsNS = 1000;
+	const int maxTimeBetweenUnblockSecs = 5;
+	const int maxTimeBetweenUnblockNS = 1000;
 	
 	// Message queue init
 	int msgid = msgget(MSG_KEY, 0666 | IPC_CREAT);
@@ -59,7 +61,8 @@ int main(int argc, char** argv) {
 	int processNum = 0;
 	int queueNum;
 	int dispatchTime;
-	struct clock lastClockTime;
+	struct clock lastNewProcessTime;
+	struct clock lastUnblockTime;
 	time_t t;
 	srand((unsigned) time(&t));
 	
@@ -68,6 +71,9 @@ int main(int argc, char** argv) {
 	initQueue(queues[0], MAX_PRO);
 	initQueue(queues[1], MAX_PRO);
 	initQueue(queues[2], MAX_PRO);
+	
+	lastUnblockTime.clockSecs = 0;
+	lastUnblockTime.clockNS = 0;
 	
 	logName = malloc(200);
 	logName = "logfile";
@@ -137,7 +143,7 @@ int main(int argc, char** argv) {
 				break;
 			}
 		}
-		if (i != MAX_PRO && (isClockLarger(shmp->ossclock, lastClockTime) == 0) && processNum < TOTAL_PRO){
+		if (i != MAX_PRO && (isClockLarger(shmp->ossclock, lastNewProcessTime) == 0) && processNum < TOTAL_PRO){
 			pid = fork();
 			switch ( pid )
 			{
@@ -152,11 +158,11 @@ int main(int argc, char** argv) {
 			default: // Parent
 				// Increment total processes created
 				processNum++;
-				lastClockTime.clockSecs = shmp->ossclock.clockSecs + (rand() % maxTimeBetweenNewProcsSecs);
-				lastClockTime.clockNS = shmp->ossclock.clockNS + (rand() % maxTimeBetweenNewProcsNS);
-				if (lastClockTime.clockNS >= 1000000000){
-					lastClockTime.clockSecs++;
-					lastClockTime.clockNS -= 1000000000;
+				lastNewProcessTime.clockSecs = shmp->ossclock.clockSecs + (rand() % maxTimeBetweenNewProcsSecs);
+				lastNewProcessTime.clockNS = shmp->ossclock.clockNS + (rand() % maxTimeBetweenNewProcsNS);
+				if (lastNewProcessTime.clockNS >= 1000000000){
+					lastNewProcessTime.clockSecs++;
+					lastNewProcessTime.clockNS -= 1000000000;
 				}
 				
 				// Store pid to process table, put into queue 0 or 1
@@ -225,8 +231,8 @@ int main(int argc, char** argv) {
 				fprintf(fptr, "OSS: Receiving that process with PID %d ran for %d nanoseconds,\n", pid, msg_t.msgclock.clockNS);
 				fprintf(fptr, "OSS: not using its entire time quantum.\n");
 				if (enqueue(queues[2], MAX_PRO, pid) != -1){
-					printf("Saving: Putting process with PID %d into blocked queue.", pid);
-					fprintf(fptr, "OSS: Putting process with PID %d into blocked queue.", pid);
+					printf("Saving: Putting process with PID %d into blocked queue.\n", pid);
+					fprintf(fptr, "OSS: Putting process with PID %d into blocked queue.\n", pid);
 				}
 				else {
 					perror("Error: enqueue");
@@ -236,10 +242,10 @@ int main(int argc, char** argv) {
 			incrementClock(shmobj(), msg_t.msgclock.clockSecs, msg_t.msgclock.clockNS);
 		}
 		
-		// Check if block queue has items, move to ready
-		if ((pid = dequeue(queues[2], MAX_PRO)) != -1){
-			printf("%d\n",queues[2][getLast(queues[2], MAX_PRO)]);
+		// Check if block queue has items and time has advanced, move to ready
+		if (queues[2][0] != 0 && (isClockLarger(shmp->ossclock, lastUnblockTime) == 0)){
 			// Store pid to process table, put into queue 0 or 1
+			pid = dequeue(queues[2], MAX_PRO);
 			if (enqueue(queues[0], MAX_PRO, pid) != -1){
 				printf("Saving: Moving process with PID %d from blocked queue to queue %d at time %d:%d.\n", pid, 0, shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
 				fprintf(fptr, "OSS: Moving process with PID %d from blocked queue to queue %d at time %d:%d.\n", pid, 0, shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
@@ -252,21 +258,32 @@ int main(int argc, char** argv) {
 				perror("Error: enqueue");
 				exit(-1);
 			}
+			lastUnblockTime.clockSecs = shmp->ossclock.clockSecs + (rand() % maxTimeBetweenUnblockSecs);
+			lastUnblockTime.clockNS = shmp->ossclock.clockNS + (rand() % maxTimeBetweenUnblockNS);
+			if (lastUnblockTime.clockNS >= 1000000000){
+				lastUnblockTime.clockSecs++;
+				lastUnblockTime.clockNS -= 1000000000;
+			}
 		}
 		
+		// Check if oss is due for termination
 		if (processNum >= TOTAL_PRO){
-			sleep(1); // Catch any slow child processes
-			if (waitpid(0, &status, WNOHANG) < 1 && dequeue(queues[0], MAX_PRO) == -1 && dequeue(queues[1], MAX_PRO) == -1 && dequeue(queues[2], MAX_PRO) == -1){
+			//sleep(1);
+			if (waitpid(0, &status, WNOHANG) < 1 && (queues[0][0] == 0) && (queues[1][0] == 0) && (queues[2][0] == 0)){
 				fclose(fptr);
 				logexit();
 				return 0;
 			}
 		}
 	}
-	fclose(fptr);
-	logexit();
 	return -1;
 }
+
+/* DEBUG
+			for (i = 0; i < MAX_PRO; i++){
+				printf("%d\n",queues[0][i]);
+			}
+*/
 
 // Logs termination time
 void logexit(){
