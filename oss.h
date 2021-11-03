@@ -8,6 +8,7 @@ runsim.h
 #define OSS_H
 #define MAX_PRO 18
 #define TOTAL_PRO 1
+#define MAX_DISPATCH 4000
 
 void logexit();
 void sigint_parent(int sig);

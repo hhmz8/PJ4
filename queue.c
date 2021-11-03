@@ -20,7 +20,7 @@ int getLast(int array[], int size){
 	return -1;
 }
 
-int enqueue(int array[], int size, int item){
+int enqueue(int* array, int size, int item){
 	if (getLast(array, size) != -1) {
 		array[getLast(array, size)] = item;
 		return 0;
@@ -28,7 +28,7 @@ int enqueue(int array[], int size, int item){
 	return -1;
 }
 
-int dequeue(int array[], int size){
+int dequeue(int* array, int size){
 	if (array[0] == 0) {
 		return -1;
 	}

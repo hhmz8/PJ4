@@ -56,10 +56,17 @@ int main(int argc, char** argv) {
 	int option = 0;
 	int terminationTime = 0;
 	int processNum = 0;
+	int queueNum;
+	int dispatchTime;
+	time_t t;
+	srand((unsigned) time(&t));
+	
+	// Initialize queue items to 0 
 	int queues[3][MAX_PRO];
 	initQueue(queues[0], MAX_PRO);
 	initQueue(queues[1], MAX_PRO);
 	initQueue(queues[2], MAX_PRO);
+	
 	logName = malloc(200);
 	logName = "logfile";
 
@@ -119,11 +126,12 @@ int main(int argc, char** argv) {
 	}
 	shmp = shmat(shmid, 0, 0);
 	
-	// Fork loop
+	// Main loop
 	while(1){
 		
+		// If process limit isn't reached, fork a process
 		for (i = 0; i < MAX_PRO; i++){
-			if (shmp->processTable[i].processPid < 1) {
+			if (shmp->processTable[i].processPid == 0) {
 				break;
 			}
 		}
@@ -144,37 +152,73 @@ int main(int argc, char** argv) {
 				break;
 			}
 		}
-		// Store pid to process table
+		
+		// Store pid to process table, put into queue 0 or 1
 		shmp->processTable[i].processPid = pid;
-		printf("Saving: Generating process with PID %d and putting it in queue %d at time %d:%d.\n", pid, 0, shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
-		fprintf(fptr, "OSS: Generating process with PID %d and putting it in queue %d at time %d:%d.\n", pid, 0, shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
+		if (enqueue(queues[0], MAX_PRO, pid) != -1){
+			printf("Saving: Generating process with PID %d and putting it in queue %d at time %d:%d.\n", pid, 0, shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
+			fprintf(fptr, "OSS: Generating process with PID %d and putting it in queue %d at time %d:%d.\n", pid, 0, shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
+		}
+		else if (enqueue(queues[1], MAX_PRO, pid) != -1){
+			printf("Saving: Generating process with PID %d and putting it in queue %d at time %d:%d.\n", pid, 1, shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
+			fprintf(fptr, "OSS: Generating process with PID %d and putting it in queue %d at time %d:%d.\n", pid, 1, shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
+		}
+		else { 
+			perror("Error: enqueue");
+			exit(-1);
+		}
 		
 		// Grab item from highest priority non-empty queue
-		
-		
-		// Send message to child if item is found, wait for child
-		msg_t.mtype = pid;
-		msgsnd(msgid, &msg_t, sizeof(msg_t), 0);
-		msgrcv(msgid, &msg_t, sizeof(msg_t), 1, 0);
-		
-		if (msg_t.queueType != 2) {
-			printf("Saving: Receiving that process with PID %d ran for %d nanoseconds.\n", pid, msg_t.msgclock.clockNS);
-			fprintf(fptr, "OSS: Receiving that process with PID %d ran for %d nanoseconds.\n", pid, msg_t.msgclock.clockNS);
+		if ((pid = dequeue(queues[0], MAX_PRO)) != -1){
+			queueNum = 0;
+		}
+		else if ((pid = dequeue(queues[1], MAX_PRO)) != -1){
+			queueNum = 1;
 		}
 		else {
-			printf("Saving: Receiving that process with PID %d ran for %d nanoseconds,\n", pid, msg_t.msgclock.clockNS);
-			printf("Saving: not using its entire time quantum.\n");
-			fprintf(fptr, "OSS: Receiving that process with PID %d ran for %d nanoseconds,\n", pid, msg_t.msgclock.clockNS);
-			fprintf(fptr, "OSS: not using its entire time quantum.\n");
+			queueNum = -1;
 		}
-		incrementClock(shmobj(), msg_t.msgclock.clockSecs, msg_t.msgclock.clockNS);
-		
-		if (processNum > TOTAL_PRO){
-			printf("OSS: Reached process limit.\n");
-			break;
+		if (queueNum != -1){
+			dispatchTime = (rand() % MAX_DISPATCH);
+			incrementClock(shmobj(), 0, dispatchTime);
+			printf("Saving: Dispatching process with PID %d from queue %d at time %d:%d,\n", pid, queueNum, shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
+			printf("Saving: total time this dispatch was %d nanoseconds.\n", dispatchTime);
+			fprintf(fptr, "OSS: Dispatching process with PID %d from queue %d at time %d:%d,\n", pid, queueNum, shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
+			fprintf(fptr, "OSS: total time this dispatch was %d nanoseconds.\n", dispatchTime);
+			
+			// Send message to child if item is found, wait for child
+			msg_t.mtype = pid;
+			msgsnd(msgid, &msg_t, sizeof(msg_t), 0);
+			msgrcv(msgid, &msg_t, sizeof(msg_t), 1, 0);
+			
+			if (msg_t.queueType != 2) {
+				// Remove from process table if process is finished
+				printf("Saving: Receiving that process with PID %d ran for %d nanoseconds.\n", pid, msg_t.msgclock.clockNS);
+				fprintf(fptr, "OSS: Receiving that process with PID %d ran for %d nanoseconds.\n", pid, msg_t.msgclock.clockNS);
+				for (i = 0; i < MAX_PRO; i++){
+					if (shmp->processTable[i].processPid == pid) {
+						shmp->processTable[i].processPid = 0;
+						shmp->processTable[i].processBlockNS = 0;
+						break;
+					}
+				}
+			}
+			else {
+				// Put process into blocked queue
+				printf("Saving: Receiving that process with PID %d ran for %d nanoseconds,\n", pid, msg_t.msgclock.clockNS);
+				printf("Saving: not using its entire time quantum.\n");
+				fprintf(fptr, "OSS: Receiving that process with PID %d ran for %d nanoseconds,\n", pid, msg_t.msgclock.clockNS);
+				fprintf(fptr, "OSS: not using its entire time quantum.\n");
+			}
+			incrementClock(shmobj(), msg_t.msgclock.clockSecs, msg_t.msgclock.clockNS);
+			
+			if (processNum > TOTAL_PRO){
+				printf("OSS: Reached process limit.\n");
+				break;
+			}
+			
+			sleep(1);
 		}
-		
-		sleep(1);
 	}
 	fclose(fptr);
 	logexit();
@@ -277,8 +321,13 @@ struct shmseg* shmobj(){
 
 // Initializes shared memory segment
 void initshmobj(struct shmseg* shmp){
+	int i;
 	shmp->ossclock.clockSecs = 0;
 	shmp->ossclock.clockNS = 0;
+	for (i = 0; i < MAX_PRO; i++){
+		shmp->processTable[i].processPid = 0;
+		shmp->processTable[i].processBlockNS = 0;
+	}
 }
 
 // Increments the clock by seconds and nanoseconds

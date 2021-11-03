@@ -9,7 +9,7 @@ queue.h
 
 void initQueue(int* array, int size);
 int getLast(int array[], int size);
-int enqueue(int array[], int size, int item);
-int dequeue(int array[], int size);
+int enqueue(int* array, int size, int item);
+int dequeue(int* array, int size);
 
 #endif
