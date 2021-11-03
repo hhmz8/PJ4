@@ -209,6 +209,14 @@ int main(int argc, char** argv) {
 				printf("Saving: not using its entire time quantum.\n");
 				fprintf(fptr, "OSS: Receiving that process with PID %d ran for %d nanoseconds,\n", pid, msg_t.msgclock.clockNS);
 				fprintf(fptr, "OSS: not using its entire time quantum.\n");
+				if (enqueue(queues[2], MAX_PRO, pid) != -1){
+					printf("Saving: Putting process with PID %d into blocked queue.", pid);
+					fprintf(fptr, "OSS: Generating process with PID %d and putting it in queue %d at time %d:%d.\n", pid, 0, shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
+				}
+				else {
+					perror("Error: enqueue");
+					exit(-1);
+				}
 			}
 			incrementClock(shmobj(), msg_t.msgclock.clockSecs, msg_t.msgclock.clockNS);
 			
@@ -217,7 +225,25 @@ int main(int argc, char** argv) {
 				break;
 			}
 			
-			sleep(1);
+			//sleep(1);
+		}
+		
+		// Check if block queue has items, move to ready
+		if ((pid = dequeue(queues[2], MAX_PRO)) != -1){
+			printf("%d\n",queues[2][getLast(queues[2], MAX_PRO)]);
+			// Store pid to process table, put into queue 0 or 1
+			if (enqueue(queues[0], MAX_PRO, pid) != -1){
+				printf("Saving: Moving process with PID %d from blocked queue to queue %d at time %d:%d.\n", pid, 0, shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
+				fprintf(fptr, "OSS: Moving process with PID %d from blocked queue to queue %d at time %d:%d.\n", pid, 0, shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
+			}
+			else if (enqueue(queues[1], MAX_PRO, pid) != -1){
+				printf("Saving: Moving process with PID %d from blocked queue to queue %d at time %d:%d.\n", pid, 1, shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
+				fprintf(fptr, "OSS: Moving process with PID %d from blocked queue to queue %d at time %d:%d.\n", pid, 1, shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
+			}
+			else { 
+				perror("Error: enqueue");
+				exit(-1);
+			}
 		}
 	}
 	fclose(fptr);

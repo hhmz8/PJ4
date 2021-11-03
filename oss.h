@@ -7,7 +7,7 @@ runsim.h
 #ifndef OSS_H
 #define OSS_H
 #define MAX_PRO 18
-#define TOTAL_PRO 1
+#define TOTAL_PRO 3
 #define MAX_DISPATCH 4000
 
 void logexit();

@@ -19,16 +19,17 @@ userprocess.c
 #define EXIT_PCT 10
 #define CPU_PCT 60
 #define CPU_BLOCK 10
-#define IO_BLOCK 60
+#define IO_BLOCK 70
 #define MAX_NS 9000000
 
 // Reference: https://www.tutorialspoint.com/c_standard_library/c_function_rand.htm
 int main(int argc, char** argv){
 	pid_t pid = getpid();
 	time_t t;
-	srand((unsigned) time(&t));
+	srand((unsigned) time(&t) ^ (getpid()<<16)); // Reference: https://stackoverflow.com/questions/8623131/why-is-rand-not-so-random-after-fork
 	int processType;
 	int blockChance;
+	int queueType;
 	
 	// Termination
 	if ((rand() % 100) < EXIT_PCT){
@@ -52,10 +53,10 @@ int main(int argc, char** argv){
 	
 	// Block
 	if ((rand() % 100) < blockChance){
-		msg_t.queueType = 0;
+		queueType = 0;
 	}
 	else {
-		msg_t.queueType = 2;
+		queueType = 2;
 	}
 	
 	int runtime = rand() % MAX_NS;
@@ -66,7 +67,7 @@ int main(int argc, char** argv){
 	
 	// Set message
 	msg_t.mtype = 1;
-	msg_t.queueType = 0;
+	msg_t.queueType = queueType;
 	msg_t.msgclock.clockSecs = 0;
 	msg_t.msgclock.clockNS = runtime;
 	msg_t.maxNS = runtime;
