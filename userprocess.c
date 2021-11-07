@@ -19,7 +19,7 @@ userprocess.c
 #define EXIT_PCT 10
 #define CPU_PCT 60
 #define CPU_BLOCK 10
-#define IO_BLOCK 70
+#define IO_BLOCK 60
 #define MAX_NS 500000000
 
 // Reference: https://www.tutorialspoint.com/c_standard_library/c_function_rand.htm
@@ -82,7 +82,6 @@ int main(int argc, char** argv){
 		msg_t.queueType = queueType;
 		msg_t.msgclock.clockSecs = 0;
 		msg_t.msgclock.clockNS = runTime;
-		msg_t.maxNS = maxRunTime;
 		
 		// Send message
 		msgsnd(msgid, &msg_t, sizeof(msg_t), 0);

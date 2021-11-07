@@ -7,7 +7,7 @@ runsim.h
 #ifndef OSS_H
 #define OSS_H
 #define MAX_PRO 18
-#define TOTAL_PRO 8
+#define TOTAL_PRO 3
 #define MAX_DISPATCH 10000
 #define MAX_UNBLOCK 20000
 
@@ -19,7 +19,10 @@ void sigalrm(int sig);
 void parent();
 void child();
 void deallocate();
-void incrementClock(struct shmseg* shmp, int incS, int incNS);
+
+int getPidIndex(struct shmseg* shmp, int pid);
+struct clock mathClock(int operation, struct clock inClock, struct clock mathClock);
+void incrementClockShm(struct shmseg* shmp, int incS, int incNS);
 int isClockLarger(struct clock clockA, struct clock clockB);
 
 struct shmseg* shmobj();

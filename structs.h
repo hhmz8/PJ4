@@ -12,6 +12,8 @@ struct clock {
 struct process {
 	int processPid;
 	int processBlockNS;
+	struct clock processInitTime;
+	struct clock processInitWaitTime;
 };
 
 // Process control block
@@ -29,7 +31,6 @@ struct msgbuf {
 	long mtype;
 	int queueType;
 	struct clock msgclock;
-	int maxNS;
 } msg_t;
 
 #endif
