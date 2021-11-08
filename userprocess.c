@@ -17,7 +17,7 @@ userprocess.c
 #include "structs.h"
 
 #define EXIT_PCT 10
-#define CPU_PCT 60
+#define CPU_PCT 70
 #define CPU_BLOCK 10
 #define IO_BLOCK 60
 #define MAX_NS 50000000
@@ -56,7 +56,7 @@ int main(int argc, char** argv){
 	
 	while (currentTime < maxRunTime){
 		// Block
-		if ((rand() % 100) > blockChance || (maxRunTime - currentTime) < 100){ // Don't block is remaining time is less than 100 NS
+		if ((rand() % 100) > blockChance || (maxRunTime - currentTime) < 1000){ // Don't block is remaining time is less than 1000 NS
 			queueType = 0;
 			runTime = maxRunTime - currentTime;
 			currentTime = maxRunTime;
@@ -72,10 +72,8 @@ int main(int argc, char** argv){
 		
 		int msgid = msgget(MSG_KEY, 0666 | IPC_CREAT);
 		
-		printf("%d WAITING\n", pid);
 		// Wait for message of type pid
 		msgrcv(msgid, &msg_t, sizeof(msg_t), pid, 0);
-		printf("%d FINISHED WAITING. %d:%d\n", pid, currentTime, maxRunTime);
 		
 		// Set message
 		msg_t.mtype = 1;
