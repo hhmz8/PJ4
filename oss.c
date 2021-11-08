@@ -35,17 +35,18 @@ int main(int argc, char** argv) {
 	signal(SIGALRM, sigalrm);
 	
 	// Interval constants
-	const int maxTimeBetweenNewProcsSecs = 1;
-	const int maxTimeBetweenNewProcsNS = 1000;
-	const int maxTimeBetweenUnblockSecs = 5;
+	const int maxTimeBetweenNewProcsSecs = 0;
+	const int maxTimeBetweenNewProcsNS = 50000000;
+	const int maxTimeBetweenUnblockSecs = 1;
 	const int maxTimeBetweenUnblockNS = 1000;
 	
 	// Statistics
-	int dispatches = 0;
-	struct clock sumWaitTime = {0, 0};
-	//struct clock averageSystemTime = {0, 0};
-	//struct clock averageBlockedTime[2] = [{0, 0},{0, 0}];
-	//struct clock CPUIdleTime = {0, 0};
+	int dispatchNum = 0, processNum = 0, idle = 1;
+	int blockNum[2] = {0,0};
+	struct clock sumWaitTime, sumSystemTime = {0, 0};
+	struct clock sumBlockedTimeIO = {0, 0};
+	struct clock sumBlockedTimeCPU = {0, 0};
+	struct clock CPUIdleTime = {0, 0};
 	
 	// Message queue init
 	int msgid = msgget(MSG_KEY, 0666 | IPC_CREAT);
@@ -56,15 +57,12 @@ int main(int argc, char** argv) {
 	
 	FILE* fptr;
 	int i;
-	int pid = 1;
-	int status;
+	int pid = 1, status = 0;
 	int option = 0;
 	int terminationTime = 30;
-	int processNum = 0;
-	int queueNum;
-	int dispatchTime;
-	struct clock lastNewProcessTime;
-	struct clock lastUnblockTime;
+	int queueNum, dispatchTime;
+	struct clock tempClock = {0, 0};
+	struct clock lastNewProcessTime, lastUnblockTime;
 	time_t t;
 	srand((unsigned) time(&t));
 	
@@ -81,7 +79,7 @@ int main(int argc, char** argv) {
 	logName = "logfile";
 
 	// Reference: https://www.gnu.org/software/libc/manual/html_node/Example-of-Getopt.html
-	while ((option = getopt(argc, argv, "ht:")) != -1) {
+	while ((option = getopt(argc, argv, "hs:l:")) != -1) {
 		switch (option) {
 
 		case 'h':
@@ -138,6 +136,7 @@ int main(int argc, char** argv) {
 	
 	// Main loop
 	while(1){
+		idle = 1;
 		
 		// If process limit isn't reached and clock has advanced, fork a process
 		for (i = 0; i < MAX_PRO; i++){
@@ -146,6 +145,7 @@ int main(int argc, char** argv) {
 			}
 		}
 		if (i != MAX_PRO && (isClockLarger(shmp->ossclock, lastNewProcessTime) == 0) && processNum < TOTAL_PRO){
+			idle = 0;
 			pid = fork();
 			switch ( pid )
 			{
@@ -160,7 +160,12 @@ int main(int argc, char** argv) {
 			default: // Parent
 				// Increment total processes created
 				processNum++;
-				lastNewProcessTime.clockSecs = shmp->ossclock.clockSecs + (rand() % maxTimeBetweenNewProcsSecs);
+				if (maxTimeBetweenNewProcsSecs != 0){
+					lastNewProcessTime.clockSecs = shmp->ossclock.clockSecs + (rand() % maxTimeBetweenNewProcsSecs);
+				}
+				else {
+					lastNewProcessTime.clockSecs = shmp->ossclock.clockSecs + 0;
+				}
 				lastNewProcessTime.clockNS = shmp->ossclock.clockNS + (rand() % maxTimeBetweenNewProcsNS);
 				if (lastNewProcessTime.clockNS >= 1000000000){
 					lastNewProcessTime.clockSecs++;
@@ -171,6 +176,8 @@ int main(int argc, char** argv) {
 				shmp->processTable[i].processPid = pid;
 				shmp->processTable[i].processInitTime = shmp->ossclock;
 				shmp->processTable[i].processInitWaitTime = shmp->ossclock;
+				shmp->processTable[i].processBlockedTime.clockSecs = 0;
+				shmp->processTable[i].processBlockedTime.clockNS = 0;
 				if (enqueue(queues[0], MAX_PRO, pid) != -1){
 					printf("Saving: Generating process with PID %d and putting it in queue %d at time %d:%d.\n", pid, 0, shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
 					fprintf(fptr, "OSS: Generating process with PID %d and putting it in queue %d at time %d:%d.\n", pid, 0, shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
@@ -185,12 +192,6 @@ int main(int argc, char** argv) {
 				}
 				break;
 			}
-		}
-		else {
-			// Advance clock by a small amount if no process was forked
-			incrementClockShm(shmobj(), 1, 0);
-			printf("Saving: No process forked, passing time to %d:%d.\n", shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
-			fprintf(fptr, "OSS: No process forked, passing time to %d:%d.\n", shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
 		}
 		
 		// Grab item from highest priority non-empty queue, dispatch it
@@ -214,7 +215,7 @@ int main(int argc, char** argv) {
 			
 			// Record wait time
 			sumWaitTime = mathClock(0, sumWaitTime, mathClock(1, shmp->ossclock,shmp->processTable[getPidIndex(shmobj(),pid)].processInitWaitTime));
-			dispatches++;
+			dispatchNum++;
 			
 			// Send message to child if item is found, wait for child
 			msg_t.mtype = pid;
@@ -222,15 +223,11 @@ int main(int argc, char** argv) {
 			msgrcv(msgid, &msg_t, sizeof(msg_t), 1, 0);
 			
 			if (msg_t.queueType != 2) {
-				// Remove from process table if process is finished
+				// Remove from process table if process is finished, record system time
+				sumSystemTime = mathClock(0, sumSystemTime, mathClock(1, shmp->ossclock, shmp->processTable[getPidIndex(shmobj(),pid)].processInitTime));
 				printf("Saving: Receiving that process with PID %d ran for %d nanoseconds.\n", pid, msg_t.msgclock.clockNS);
 				fprintf(fptr, "OSS: Receiving that process with PID %d ran for %d nanoseconds.\n", pid, msg_t.msgclock.clockNS);
-				for (i = 0; i < MAX_PRO; i++){
-					if (shmp->processTable[i].processPid == pid) {
-						shmp->processTable[i].processPid = 0;
-						break;
-					}
-				}
+				shmp->processTable[getPidIndex(shmobj(),pid)].processPid = 0;
 			}
 			else {
 				// Put process into blocked queue
@@ -239,6 +236,8 @@ int main(int argc, char** argv) {
 				fprintf(fptr, "OSS: Receiving that process with PID %d ran for %d nanoseconds,\n", pid, msg_t.msgclock.clockNS);
 				fprintf(fptr, "OSS: not using its entire time quantum.\n");
 				if (enqueue(queues[2], MAX_PRO, pid) != -1){
+					// Record block time
+					shmp->processTable[getPidIndex(shmobj(),pid)].processInitBlockedTime = shmp->ossclock;
 					printf("Saving: Putting process with PID %d into blocked queue.\n", pid);
 					fprintf(fptr, "OSS: Putting process with PID %d into blocked queue.\n", pid);
 				}
@@ -248,12 +247,18 @@ int main(int argc, char** argv) {
 				}
 			}
 			incrementClockShm(shmobj(), msg_t.msgclock.clockSecs, msg_t.msgclock.clockNS);
+			idle = 0;
 		}
 		
 		// Check if block queue has items and time has advanced, move to ready
 		if (queues[2][0] != 0 && (isClockLarger(shmp->ossclock, lastUnblockTime) == 0)){
-			// Store pid to process table, put into queue 0 or 1
+			// Record block stats, Move to queue 0 or 1 depending on stats
 			pid = dequeue(queues[2], MAX_PRO);
+			/*tempClock = shmp->processTable[getPidIndex(shmobj(),pid)].processBlockedTime;
+			shmp->processTable[getPidIndex(shmobj(),pid)].processBlockedTime = mathClock(0, tempClock, mathClock(1, shmp->ossclock, shmp->processTable[getPidIndex(shmobj(),pid)].processInitBlockedTime));
+			if (shmp->processTable[getPidIndex(shmobj(),pid)].processBlockedTime.clockSecs >= 1){
+				printf("PROBS IO PROCESS\n");
+			}*/
 			if (enqueue(queues[0], MAX_PRO, pid) != -1){
 				printf("Saving: Moving process with PID %d from blocked queue to queue %d at time %d:%d.\n", pid, 0, shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
 				fprintf(fptr, "OSS: Moving process with PID %d from blocked queue to queue %d at time %d:%d.\n", pid, 0, shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
@@ -266,7 +271,7 @@ int main(int argc, char** argv) {
 				perror("Error: enqueue");
 				exit(-1);
 			}
-			// Record wait init time & refresh unblock period
+			// Record wait stats & refresh unblock period
 			shmp->processTable[getPidIndex(shmobj(),pid)].processInitWaitTime = shmp->ossclock;
 			lastUnblockTime.clockSecs = shmp->ossclock.clockSecs + (rand() % maxTimeBetweenUnblockSecs);
 			lastUnblockTime.clockNS = shmp->ossclock.clockNS + (rand() % maxTimeBetweenUnblockNS);
@@ -274,6 +279,16 @@ int main(int argc, char** argv) {
 				lastUnblockTime.clockSecs++;
 				lastUnblockTime.clockNS -= 1000000000;
 			}
+			idle = 0;
+		}
+		
+		// Check if no action was taken, increment system clock by a small amount
+		if (idle == 1 && !(processNum >= TOTAL_PRO && (queues[0][0] == 0) && (queues[1][0] == 0) && (queues[2][0] == 0))){
+			printf("IDLE");
+			tempClock.clockSecs = 0;
+			tempClock.clockNS = 10000000;
+			incrementClockShm(shmobj(), tempClock.clockSecs,  tempClock.clockNS);
+			CPUIdleTime = mathClock(0, CPUIdleTime, tempClock);
 		}
 		
 		// Check if oss is due for termination
@@ -281,7 +296,9 @@ int main(int argc, char** argv) {
 			if (waitpid(0, &status, WNOHANG) < 1 && (queues[0][0] == 0) && (queues[1][0] == 0) && (queues[2][0] == 0)){
 				// Normal termination, show stats
 				printf("-----------------------------------\n");
-				printf("Average process wait time: %d:%d\n", sumWaitTime.clockSecs / dispatches, sumWaitTime.clockNS / dispatches);
+				printf("Average process wait time: %d:%d\n", sumWaitTime.clockSecs / dispatchNum, sumWaitTime.clockNS / dispatchNum);
+				printf("Average process system time: %d:%d\n", sumSystemTime.clockSecs / processNum, sumSystemTime.clockNS / processNum);
+				//printf("CPU idle time: %d:%d\n", CPUIdleTime.clockSecs, CPUIdleTime.clockNS);
 				printf("-----------------------------------\n");
 				fclose(fptr);
 				logexit();
@@ -400,8 +417,8 @@ void initshmobj(struct shmseg* shmp){
 
 // Math one clock to another 
 struct clock mathClock(int operation, struct clock inClock, struct clock mathClock){
-	printf("IN: %d:%d\n", inClock.clockSecs, inClock.clockNS);
-	printf("MATH: %d:%d\n", mathClock.clockSecs, mathClock.clockNS);
+	//printf("IN: %d:%d\n", inClock.clockSecs, inClock.clockNS);
+	//printf("MATH: %d:%d\n", mathClock.clockSecs, mathClock.clockNS);
 	if (operation == 0) {
 		inClock.clockSecs += mathClock.clockSecs;
 		inClock.clockNS += mathClock.clockNS;
@@ -418,7 +435,7 @@ struct clock mathClock(int operation, struct clock inClock, struct clock mathClo
 		inClock.clockSecs--;
 		inClock.clockNS += 1000000000;
 	}
-	printf("MATHRESULT: %d:%d\n", inClock.clockSecs, inClock.clockNS);
+	//printf("MATHRESULT: %d:%d\n", inClock.clockSecs, inClock.clockNS);
 	return inClock;
 }
 

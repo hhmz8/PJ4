@@ -14,6 +14,8 @@ struct process {
 	int processBlockNS;
 	struct clock processInitTime;
 	struct clock processInitWaitTime;
+	struct clock processInitBlockedTime;
+	struct clock processBlockedTime;
 };
 
 // Process control block

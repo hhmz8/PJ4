@@ -20,7 +20,7 @@ userprocess.c
 #define CPU_PCT 60
 #define CPU_BLOCK 10
 #define IO_BLOCK 60
-#define MAX_NS 500000000
+#define MAX_NS 50000000
 
 // Reference: https://www.tutorialspoint.com/c_standard_library/c_function_rand.htm
 int main(int argc, char** argv){
@@ -56,7 +56,7 @@ int main(int argc, char** argv){
 	
 	while (currentTime < maxRunTime){
 		// Block
-		if ((rand() % 100) < blockChance || (maxRunTime - currentTime) < 100){ // Don't block is remaining time is less than 100 NS
+		if ((rand() % 100) > blockChance || (maxRunTime - currentTime) < 100){ // Don't block is remaining time is less than 100 NS
 			queueType = 0;
 			runTime = maxRunTime - currentTime;
 			currentTime = maxRunTime;
