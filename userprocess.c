@@ -16,11 +16,10 @@ userprocess.c
 #include <unistd.h> //sleep
 #include "structs.h"
 
-#define EXIT_PCT 10
 #define CPU_PCT 70
 #define CPU_BLOCK 10
 #define IO_BLOCK 60
-#define MAX_NS 50000000
+#define MAX_NS 50000000 // Max run time in NS 
 
 // Reference: https://www.tutorialspoint.com/c_standard_library/c_function_rand.htm
 int main(int argc, char** argv){
@@ -34,13 +33,8 @@ int main(int argc, char** argv){
 	int currentTime = 0;
 	int runTime;
 	
-	// Termination
-	if ((rand() % 100) < EXIT_PCT){
-		msg_t.queueType = -1;
-	}
-	
 	 // CPU / IO
-	else if ((rand() % 100) < CPU_PCT){
+	if ((rand() % 100) < CPU_PCT){
 		processType = 1;
 	}
 	else {

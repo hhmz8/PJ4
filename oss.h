@@ -9,7 +9,7 @@ runsim.h
 #define MAX_PRO 18
 #define TOTAL_PRO 100
 #define MAX_DISPATCH 10000
-#define MAX_UNBLOCK 40000
+#define MAX_UNBLOCK 20000
 
 void logexit();
 void sigint_parent(int sig);
@@ -21,6 +21,7 @@ void child();
 void deallocate();
 
 int getPidIndex(struct shmseg* shmp, int pid);
+
 struct clock mathClock(int operation, struct clock inClock, struct clock mathClock);
 void incrementClockShm(struct shmseg* shmp, int incS, int incNS);
 int isClockLarger(struct clock clockA, struct clock clockB);

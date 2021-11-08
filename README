@@ -1,22 +1,63 @@
 Hanzhe Huang
-10/31/2021
+11/08/2021
 Project 4
 
 Description:
-This program manages n licenses and logs messages into the logfile through licensed child processes, and manages the critical section with the use of a message queue.
-The command line stdin should contain lines in the format of "testsim int int", similarly to the example file, testing.data.
+This program simulates an OSS scheduling processes with a system clock, priority queues and a blocked queue.
+Communication between the OSS and user processes are done through messages sent through a message queue.
+
+Each scheduling decision is recorded in the logfile as well as the OSS termination time.
+Several statistics are recorded in the console once the OSS finishes parsing through 100 processes. 
+
+
+User Process Constants:
+Several constants are defined in "userprocess.c" to determine how often a process is CPU-bound or IO-bound,
+as well as whether they are blocked or run for the full duration. A process is more likely to be CPU-bound,
+and a process is more likely to be blocked if it's IO-bound.
+
+Chance for a process to be CPU-bound: 70%
+Chance for a process to be IO-bound: 30%
+Chance for a CPU-bound process to be blocked: 10%
+Chance for a IO-bound process to be blocked: 60%
+
+
+OSS Constants:
+Other constants are defined in "oss.c" or "oss.h" to determine how often a new process is created, unblocked and scheduling durations.
+
+Total number of processes to schedule: 100 
+Max number of processes in CPU: 18 
+Max time between new processes: 1:50000000 (Seconds:Nanoseconds)
+Max time between unblocks: 2:1000
+
 
 Usage:
-./runsim [n] < stdin
+./oss [-h] [-s t] [-l f]
 
-Example Usage:
-./runsim 2 < testing.data
+
+Example Usages:
+./oss
+./oss -s 3 -l logfile
+
+
+Usage Notes:
+[-s]: No termination time is set by default. On my end the program tend to finish within a second unless it parses more than 100 processes.
+[-l]: "logfile" is set as the default logfile name if none is given.
+
 
 Files:
-oss.c, oss.h, makefile, logfile(generated), README
+oss.c, oss.h, queue.c, queue.h, structs.h, userprocess.c, makefile, logfile(generated), README
+
 
 References:
-
+https://www.tutorialspoint.com/inter_process_communication/inter_process_communication_shared_memory.htm
+https://stackoverflow.com/questions/19461744/how-to-make-parent-wait-for-all-child-processes-to-finish
+https://www.tutorialspoint.com/inter_process_communication/inter_process_communication_message_queues.htm
+https://www.geeksforgeeks.org/ipc-using-message-queues/
+https://www.gnu.org/software/libc/manual/html_node/Example-of-Getopt.html
+http://www.cs.umsl.edu/~sanjiv/classes/cs4760/src/shm.c
+https://www.geeksforgeeks.org/signals-c-set-2/
+https://www.tutorialspoint.com/c_standard_library/c_function_rand.htm
+https://stackoverflow.com/questions/8623131/why-is-rand-not-so-random-after-fork
 
 
 Git Repository:

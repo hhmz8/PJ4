@@ -256,13 +256,17 @@ int main(int argc, char** argv) {
 		// Check if block queue has items and time has advanced, move to ready
 		if (queues[2][0] != 0 && (isClockLarger(shmp->ossclock, lastUnblockTime) == 0)){
 			// Record block stats, Move to queue 0 or 1 depending on time spent in blocked queue
+			// Also increment system clock by some time
+			dispatchTime = (rand() % MAX_UNBLOCK);
+			incrementClockShm(shmobj(), 0, dispatchTime);
+			
 			pid = dequeue(queues[2], MAX_PRO);
 			tempClock = shmp->processTable[getPidIndex(shmobj(),pid)].processBlockedTime;
 			shmp->processTable[getPidIndex(shmobj(),pid)].processBlockedTime = mathClock(0, tempClock, mathClock(1, shmp->ossclock, shmp->processTable[getPidIndex(shmobj(),pid)].processInitBlockedTime));
 			if (shmp->processTable[getPidIndex(shmobj(),pid)].processBlockedTime.clockSecs >= 1){
 				if (enqueue(queues[0], MAX_PRO, pid) != -1){
-					printf("Saving: Moving process with PID %d from blocked queue to queue %d at time %d:%d.\n", pid, 0, shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
-					fprintf(fptr, "OSS: Moving process with PID %d from blocked queue to queue %d at time %d:%d.\n", pid, 0, shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
+					printf("Saving: Moving process with PID %d from blocked queue to queue %d at time %d:%d,\n", pid, 0, shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
+					fprintf(fptr, "OSS: Moving process with PID %d from blocked queue to queue %d at time %d:%d,\n", pid, 0, shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
 				}
 				else { 
 					perror("Error: enqueue");
@@ -270,13 +274,16 @@ int main(int argc, char** argv) {
 				}
 			}
 			else if (enqueue(queues[1], MAX_PRO, pid) != -1){
-				printf("Saving: Moving process with PID %d from blocked queue to queue %d at time %d:%d.\n", pid, 1, shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
-				fprintf(fptr, "OSS: Moving process with PID %d from blocked queue to queue %d at time %d:%d.\n", pid, 1, shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
+				printf("Saving: Moving process with PID %d from blocked queue to queue %d at time %d:%d,\n", pid, 1, shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
+				fprintf(fptr, "OSS: Moving process with PID %d from blocked queue to queue %d at time %d:%d,\n", pid, 1, shmp->ossclock.clockSecs, shmp->ossclock.clockNS);
 			}
 			else { 
 				perror("Error: enqueue");
 				exit(-1);
 			}
+			printf("Saving: total time transferring was %d nanoseconds.\n", dispatchTime);
+			fprintf(fptr, "OSS: total time transferring was %d nanoseconds.\n", dispatchTime);
+			
 			// Record wait stats & refresh unblock period
 			shmp->processTable[getPidIndex(shmobj(),pid)].processInitWaitTime = shmp->ossclock;
 			lastUnblockTime.clockSecs = shmp->ossclock.clockSecs + (rand() % maxTimeBetweenUnblockSecs);
@@ -325,7 +332,7 @@ void logexit(){
 	time_t tempTime = time(NULL);
 	fptr = fopen(logName, "a");
 	strftime(timeBuffer, 40, "%H:%M:%S", localtime(&tempTime));
-	printf("OSS: %s %d terminated\n", timeBuffer, getpid());
+	printf("Saving: %s %d terminated\n", timeBuffer, getpid());
 	fprintf(fptr, "OSS: %s %d terminated\n", timeBuffer, getpid());
 	fclose(fptr);
 }
@@ -423,8 +430,6 @@ void initshmobj(struct shmseg* shmp){
 
 // Math one clock to another 
 struct clock mathClock(int operation, struct clock inClock, struct clock mathClock){
-	//printf("IN: %d:%d\n", inClock.clockSecs, inClock.clockNS);
-	//printf("MATH: %d:%d\n", mathClock.clockSecs, mathClock.clockNS);
 	if (operation == 0) {
 		inClock.clockSecs += mathClock.clockSecs;
 		inClock.clockNS += mathClock.clockNS;
@@ -441,7 +446,6 @@ struct clock mathClock(int operation, struct clock inClock, struct clock mathClo
 		inClock.clockSecs--;
 		inClock.clockNS += 1000000000;
 	}
-	//printf("MATHRESULT: %d:%d\n", inClock.clockSecs, inClock.clockNS);
 	return inClock;
 }
 
