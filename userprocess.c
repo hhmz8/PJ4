@@ -10,6 +10,7 @@ userprocess.c
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <sys/types.h>
+#include <signal.h>
 #include <sys/msg.h>
 #include <time.h>
 #include <ctype.h> //isprint
@@ -32,6 +33,17 @@ int main(int argc, char** argv){
 	int maxRunTime = rand() % MAX_NS;
 	int currentTime = 0;
 	int runTime;
+	
+	struct shmseg *shmp;
+    int shmid = shmget(SHM_KEY, BUF_SIZE, 0666|IPC_CREAT);
+	if (shmid == -1) {
+		perror("Error: shmget");
+		exit(-1);
+	}
+	
+	shmp = shmat(shmid, 0, 0);	
+	
+	int msgid = msgget(MSG_KEY, 0666 | IPC_CREAT);
 	
 	 // CPU / IO
 	if ((rand() % 100) < CPU_PCT){
@@ -64,8 +76,6 @@ int main(int argc, char** argv){
 			currentTime += runTime;
 		}
 		
-		int msgid = msgget(MSG_KEY, 0666 | IPC_CREAT);
-		
 		// Wait for message of type pid
 		msgrcv(msgid, &msg_t, sizeof(msg_t), pid, 0);
 		
@@ -78,5 +88,9 @@ int main(int argc, char** argv){
 		// Send message
 		msgsnd(msgid, &msg_t, sizeof(msg_t), 0);
 	}
-	return 0;
+	
+	//shm
+	shmp->numberProcesses--;
+	kill(pid, SIGKILL);
+	exit(0);
 }

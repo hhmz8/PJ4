@@ -141,6 +141,8 @@ int main(int argc, char** argv) {
 			}
 		}
 		if (i != MAX_PRO && (isClockLarger(shmp->ossclock, lastNewProcessTime) == 0) && processNum < TOTAL_PRO){
+			if (shmp->numberProcesses > 17)
+				break;
 			idle = 0;
 			pid = fork();
 			switch ( pid )
@@ -155,7 +157,12 @@ int main(int argc, char** argv) {
 
 			default: // Parent
 				// Increment total processes created
+				shmp->numberProcesses++;
 				processNum++;
+				printf("%d\n",shmp->numberProcesses);
+				if (shmp->numberProcesses > 18){
+					exit(-1);
+				}
 				if (maxTimeBetweenNewProcsSecs != 0){
 					lastNewProcessTime.clockSecs = shmp->ossclock.clockSecs + (rand() % maxTimeBetweenNewProcsSecs);
 				}
@@ -219,6 +226,8 @@ int main(int argc, char** argv) {
 			msgrcv(msgid, &msg_t, sizeof(msg_t), 1, 0);
 			
 			if (msg_t.queueType != 2) {
+				waitpid(-1, NULL, 0);
+				
 				// Remove from process table if process is finished, record system and blocked time
 				sumSystemTime = mathClock(0, sumSystemTime, mathClock(1, shmp->ossclock, shmp->processTable[getPidIndex(shmobj(),pid)].processInitTime));
 				if (shmp->processTable[getPidIndex(shmobj(),pid)].processBlockedTime.clockSecs > 0) {
@@ -420,6 +429,7 @@ struct shmseg* shmobj(){
 // Initializes shared memory segment
 void initshmobj(struct shmseg* shmp){
 	int i;
+	shmp->numberProcesses = 0;
 	shmp->ossclock.clockSecs = 0;
 	shmp->ossclock.clockNS = 0;
 	for (i = 0; i < MAX_PRO; i++){
